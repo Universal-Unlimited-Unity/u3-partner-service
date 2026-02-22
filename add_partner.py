@@ -1,65 +1,51 @@
-import sqlite3
 from U3Partner import U3PartnerModel
+from sqlalchemy import Table, MetaData, Column, create_engine,String, Enum, Integer, select, insert
 
-db_path = 'partner.db'
-
+db = 'postgresql+psycopg://postgres:adamaakif@localhost:5432/u3'
+eng = create_engine(db)
+metadata = MetaData()
+partners = Table(
+    "partners",
+    metadata,
+    Column("UnityId", String, primary_key=True),
+    Column("FirstName", String),
+    Column("MiddleName", String),
+    Column("LastName", String),
+    Column("Gender", Enum('M', 'F', name='gender')),
+    Column("Age", Integer),
+    Column("Loyalty", Enum('Universel', 'Unlimited', 'Limited', name='U3Rank'))
+  )
 def init_db():
-  conn = sqlite3.connect(db_path)
-  cursor = conn.cursor()
-
-  cursor.execute(""" CREATE TABLE IF NOT EXISTS partners (
-    First_Name TEXT,
-    Middle_Name TEXT,
-    Last_Name TEXT,
-    Age INTEGER,
-    Gender TEXT,
-    Loyalty TEXT,
-    UnityId TEXT UNIQUE) """)
-
-  conn.commit()
-  conn.close()
+  metadata.create_all(eng, checkfirst=True)
 
 def UnityId_Used(UnityId: str) -> bool:
-  conn = sqlite3.connect(db_path)
-  cursor = conn.cursor()
-  cursor.execute(""" SELECT * FROM partners
-                    WHERE UnityId = ? """, (UnityId,))
-  result = cursor.fetchone()
-  conn.close()
-  return result is not None
-  
+  with eng.connect() as conn:
+    stmt = select(partners).where(partners.c.UnityId == UnityId)
+    res = conn.execute(stmt).fetchone()
+    if res is None:
+       return False
+    return True  
+    
 def Update_UnityId(p: U3PartnerModel):
-  Edit = 1
-  UnityId_OG = p.UnityId
-  while UnityId_Used(p.UnityId):
-    Edit = Edit + sum(list(map(ord, p.FirstName+p.LastName))) // 85
-    NewUnityId = UnityId_OG + str(Edit + sum(list(map(ord, p.FirstName+p.LastName))) // 85)
-    p.UnityId = NewUnityId
-  
+    Edit = 0
+    UnityId_OG = p.UnityId
+    while UnityId_Used(p.UnityId):
+      Edit = Edit + 85
+      NewUnityId = UnityId_OG + Edit
+      p.UnityId = NewUnityId
+    
 def Add_Partner(p: U3PartnerModel):
-  init_db()
-  conn = sqlite3.connect(db_path)
-  cursor = conn.cursor()
-
   # check if unityId is unique, if not generate a new one.
 
   if (UnityId_Used(p.UnityId)):
     Update_UnityId(p)
+    
+  #Insert new partner
 
-  cursor.execute(""" INSERT INTO partners(First_Name,
-    Middle_Name,
-    Last_Name,
-    Age,
-    Gender,
-    Loyalty,
-    UnityId) 
-    VALUES (?, ?, ?, ?, ?, ?, ?) """, 
-                 (p.FirstName,
-                  p.MiddleName,
-                  p.LastName,
-                  p.Age,
-                  p.Gender.value,
-                  p.Loyalty.value,
-                  p.UnityId))
-  conn.commit()
-  conn.close()
+  with eng.connect() as conn:
+    stmt = insert(partners).values(UnityId=p.UnityId, FirstName=p.FirstName, MiddleName=p.MiddleName,LastName=p.LastName,Gender=p.Gender.value,Age=p.Age, Loyalty=p.Loyalty.value)
+    conn.execute(stmt)
+    conn.commit()
+
+
+  
