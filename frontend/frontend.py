@@ -2,7 +2,6 @@ import streamlit as st
 import requests
 import os
 
-# Use the environment variable or default to the backend service name for Docker
 API_URL = os.getenv("API_URL", "http://backend:8000/partners")
 
 st.set_page_config(page_title="U3 Partner Registry", page_icon="🤝")
@@ -20,18 +19,17 @@ with st.form("partner_form"):
         
     with col2:
         # Matches U3Gender Enum
-        gender = st.selectbox("Gender", options=["M", "F"], format_func=lambda x: "Male" if x == "M" else "Female")
+        gender = st.selectbox("Gender", options=["M", "F"]")
         
         # Matches U3Rank Enum
         loyalty = st.selectbox("Loyalty Rank", options=["Universel", "Unlimited", "Limited"])
         
         # Matches Age Field(ge=18)
-        age = st.number_input("Age", min_value=18, max_value=120, value=25)
+        age = st.number_input("Age", min_value=18)
 
     submit = st.form_submit_button("Register Partner")
 
 if submit:
-    # Construct payload to match U3PartnerModel exactly
     payload = {
         "Gender": gender,
         "Loyalty": loyalty,
